@@ -1,34 +1,44 @@
-// Minimal CallerProfile module.
-//
-// Per David's "no extra settings screen" rule this is intentionally tiny:
-// a single holder for the caller name (defaults to "Michael") plus an optional
-// photo URI, with a programmatic setter. There is no full settings UI.
+import { useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface CallerProfile {
+  id: string;
   name: string;
-  /** Optional photo URI shown as the avatar. Falls back to initials. */
   photoUri?: string;
 }
 
-let current: CallerProfile = {
-  name: 'Michael',
-};
+const DEFAULT_PRESETS: CallerProfile[] = [
+  { id: 'default', name: 'Michael' },
+  { id: 'boss', name: 'The Boss' },
+  { id: 'spouse', name: 'Wife' },
+  { id: 'emergency', name: 'Emergency' },
+];
+
+let currentProfile: CallerProfile = DEFAULT_PRESETS[0];
+let presets: CallerProfile[] = [...DEFAULT_PRESETS];
 
 export function getCaller(): CallerProfile {
-  return current;
+  return currentProfile;
 }
 
-export function setCaller(profile: Partial<CallerProfile>): CallerProfile {
-  current = { ...current, ...profile };
-  return current;
+export async function setCaller(profile: Partial<CallerProfile>): Promise<void> {
+  currentProfile = { ...currentProfile, ...profile };
+  await AsyncStorage.setItem('pardonme_current_caller', JSON.stringify(currentProfile));
 }
 
-/** Convenience: just set the displayed name. */
-export function setCallerName(name: string): void {
-  current = { ...current, name };
+export async function getPresets(): Promise<CallerProfile[]> {
+  const stored = await AsyncStorage.getItem('pardonme_presets');
+  return stored ? JSON.parse(stored) : presets;
 }
 
-/** Reset to the built-in default caller. */
-export function resetCaller(): void {
-  current = { name: 'Michael' };
+export async function addPreset(profile: CallerProfile): Promise<void> {
+  presets.push(profile);
+  await AsyncStorage.setItem('pardonme_presets', JSON.stringify(presets));
+}
+
+export async function loadSavedProfile(): Promise<void> {
+  const stored = await AsyncStorage.getItem('pardonme_current_caller');
+  if (stored) {
+    currentProfile = JSON.parse(stored);
+  }
 }
