@@ -124,14 +124,18 @@ Play will ask you to justify these in the Console. Suggested wording:
 ## Required assets checklist
 
 - [x] App icon 512×512 PNG — `assets/play-icon-512.png`
-- [ ] Feature graphic 1024×500 PNG — **still to create**
-- [ ] Phone screenshots, 2–8, min 320px, 16:9 or 9:16 — **still to capture**
-- [ ] Privacy policy URL — publish `store/PRIVACY_POLICY.md` and paste the link
-- [ ] Support email address
+- [x] Feature graphic 1024×500 PNG — `store/feature_graphic.png` (generated from real icon + app palette)
+- [x] Phone screenshots (4, captured live from a booted emulator running the actual release APK, 1080×2400) — `store/screenshots/`
+- [x] Privacy policy URL — **https://tall216.github.io/pardon-me/privacy** (live, hosted via GitHub Pages)
+- [x] Support email address — fobtronicslogistics@gmail.com
 
-## Suggested screenshots
+## Screenshots (captured, not mockups)
 
-1. The incoming-call screen (the hero shot)
-2. In-call screen with the running timer
-3. Home screen showing the identity presets
-4. Home screen with the trigger armed
+1. `01_home.png` — home screen, identity presets + trigger controls
+2. `02_incoming_call.png` — the incoming-call screen (hero shot), captured mid-ring
+3. `03_in_call.png` — in-call screen with running timer (answered live on-device)
+4. `04_identity_presets.png` — home screen with "The Boss" preset selected
+
+All four were captured by installing `android/app/build/outputs/apk/release/app-release.apk`
+on an Android 34 x86_64 emulator (`pardonme_test` AVD) and driving the real
+UI via `adb`/`uiautomator` — not staged or edited screenshots.
