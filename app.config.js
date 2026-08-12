@@ -32,7 +32,7 @@ const config: ExpoConfig = {
     package: 'com.davidevans.pardonme',
     // Bump for EVERY Play upload. Play permanently reserves each versionCode,
     // so a number can never be reused — not even after a rollback.
-    versionCode: 1,
+    versionCode: 2,
     // Play requires new apps to target a recent API level; 34 is below the
     // current bar and the upload is rejected outright.
     compileSdkVersion: 36,

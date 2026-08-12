@@ -30,6 +30,9 @@ android/.cxx/
 android/keystore.properties
 *.keystore
 !android/app/debug.keystore
+android/credentials/
+*service-account*.json
+pardon-me-tuning-*.json
 ios/build/
 ios/Pods/
 
