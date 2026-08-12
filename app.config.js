@@ -33,6 +33,10 @@ const config: ExpoConfig = {
     // Bump for EVERY Play upload. Play permanently reserves each versionCode,
     // so a number can never be reused — not even after a rollback.
     versionCode: 1,
+    // Play requires new apps to target a recent API level; 34 is below the
+    // current bar and the upload is rejected outright.
+    compileSdkVersion: 35,
+    targetSdkVersion: 35,
     // Android 12+ requires the full-screen-intent permission to be declared.
     permissions: [
       'POST_NOTIFICATIONS',
@@ -40,6 +44,15 @@ const config: ExpoConfig = {
       'RECEIVE_BOOT_COMPLETED',
       'FOREGROUND_SERVICE',
       'VIBRATE',
+    ],
+    // Permissions pulled in by dependencies that this app never exercises.
+    // Shipping an unused permission is both a privacy smell and a review
+    // risk: RECORD_AUDIO in particular makes Play (and users) believe the app
+    // can listen, and it would contradict the privacy policy.
+    blockedPermissions: [
+      'RECORD_AUDIO',
+      'READ_EXTERNAL_STORAGE',
+      'WRITE_EXTERNAL_STORAGE',
       'READ_PHONE_STATE',
     ],
     // Foreground service type used to keep the volume listener alive.

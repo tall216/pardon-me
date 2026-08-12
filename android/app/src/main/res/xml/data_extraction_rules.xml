@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Device-to-device transfer and cloud backup rules (Android 12+).
+
+  Same reasoning as backup_rules.xml: the stored state is device-specific
+  (armed flag, transient pending-call marker) and there is nothing a user
+  benefits from restoring elsewhere.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="pardonme_state.xml"/>
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="pardonme_state.xml"/>
+    </device-transfer>
+</data-extraction-rules>

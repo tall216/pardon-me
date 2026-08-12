@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cloud backup rules (Android 11 and below).
+
+  Nothing in this app is worth restoring onto a different device, and some of
+  it is actively wrong to carry across: the armed flag and any pending-call
+  marker describe the state of one phone at one moment. Excluding the whole
+  preferences file keeps restores clean and keeps user data off Google's
+  servers, which matches the privacy policy's "nothing leaves your phone".
+-->
+<full-backup-content>
+    <exclude domain="sharedpref" path="pardonme_state.xml"/>
+</full-backup-content>

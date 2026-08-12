@@ -24,9 +24,10 @@ it.
 ## What the app does NOT do
 
 - It does **not** place, receive, or interfere with real phone calls
-- It does **not** read your contacts, call log, messages, or accounts
+- It does **not** read your contacts, call log, messages, accounts, or phone state
 - It does **not** record audio or use the microphone
 - It does **not** use the camera or location
+- It does **not** read or write any files outside its own private storage
 - It does **not** connect to the internet or transmit anything
 - It contains no advertising or analytics SDKs
 
@@ -61,9 +62,6 @@ whatever is on screen when the call fires.
 
 **MODIFY_AUDIO_SETTINGS** — raises the ringer for the duration of the fake
 call and puts your original volume back afterwards.
-
-**READ_PHONE_STATE** — used only to avoid interrupting a genuine phone call in
-progress. No phone numbers or identifiers are read or stored.
 
 ## Children
 
