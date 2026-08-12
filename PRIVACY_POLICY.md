@@ -54,8 +54,10 @@ If this policy changes, the updated version will be posted here and the "Last up
 
 David Evans — Fobtronics Logistics  
 Painesville, OH  
-Email: [your email here]
+Email: fobtronicslogistics@gmail.com
 
 ---
 
-*This policy is also hosted at the URL you provide to Google Play during app review.*
+*The canonical, hosted copy of this policy is at:
+https://tall216.github.io/pardon-me/privacy — use that URL in the Play
+Console's Data safety section.*

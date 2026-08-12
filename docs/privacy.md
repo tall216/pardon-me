@@ -1,3 +1,7 @@
+---
+title: Privacy Policy — Pardon Me
+---
+
 # Privacy Policy — Pardon Me
 
 **Last updated:** 12 August 2026
@@ -63,6 +67,11 @@ whatever is on screen when the call fires.
 **MODIFY_AUDIO_SETTINGS** — raises the ringer for the duration of the fake
 call and puts your original volume back afterwards.
 
+## Third-Party Services
+
+None. The app uses no third-party analytics, advertising, or tracking
+services.
+
 ## Children
 
 Pardon Me is not directed at children under 13 and collects no data from
@@ -75,10 +84,4 @@ the date above will be revised.
 
 ## Contact
 
-Questions about privacy: fobtronicslogistics@gmail.com
-
----
-
-*The canonical, hosted copy of this policy is at:
-https://tall216.github.io/pardon-me/privacy — use that URL in the Play
-Console's Data safety section.*
+Questions about privacy: **fobtronicslogistics@gmail.com**
