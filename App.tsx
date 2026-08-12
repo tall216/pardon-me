@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { OldPhoneIcon } from './src/OldPhoneIcon';
 import { FakeCallOverlay } from './src/FakeCallOverlay';
-import { useFakeCall, endCall, answerCall, triggerFakeCall, scheduleNativeCall, useNativeCallBridge, checkFullScreenPermission, openFullScreenSettings, hasNativeCall } from './src/fakeCall';
+import { useFakeCall, endCall, answerCall, triggerFakeCall, scheduleNativeCall, useNativeCallBridge, hasNativeCall } from './src/fakeCall';
+import { useDeviceReadiness } from './src/deviceReadiness';
 import { useStealthTrigger, syncCallerToNative } from './src/volumeListener';
 import { getCaller, setCaller, getPresets, addPreset, loadSavedProfile } from './src/CallerProfile';
 
@@ -19,8 +20,11 @@ export default function App() {
   const call = useFakeCall();
   const [name, setName] = useState(getCaller().name);
   const [presets, setPresets] = useState<any[]>([]);
-  const [fsAllowed, setFsAllowed] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
+
+  // What this specific phone/OS will actually permit. Re-checks on resume,
+  // since the user fixes these in Settings and comes back.
+  const { readiness, issues, checked, fix } = useDeviceReadiness();
 
   // Raises the call UI when the app is opened by a call notification.
   useNativeCallBridge();
@@ -30,7 +34,6 @@ export default function App() {
       await loadSavedProfile();
       setName(getCaller().name);
       await loadPresets();
-      setFsAllowed(await checkFullScreenPermission());
     })();
   }, []);
 
@@ -100,13 +103,38 @@ export default function App() {
             {status && <Text style={styles.status}>{status}</Text>}
           </View>
 
-          {!fsAllowed && (
-            <TouchableOpacity style={styles.warnCard} onPress={() => openFullScreenSettings()}>
-              <Text style={styles.warnTitle}>Action needed</Text>
-              <Text style={styles.warnText}>
-                Allow full-screen notifications so calls can appear on the lock screen. Tap to open settings.
+          {/*
+            Device setup. Every item here is a capability Android gates behind
+            a version-specific permission, so the list is built from what this
+            particular phone reports rather than from assumptions.
+          */}
+          {issues.length > 0 && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Device Setup</Text>
+              {issues.map((issue) => (
+                <TouchableOpacity
+                  key={issue.key}
+                  style={[
+                    styles.warnCard,
+                    issue.severity === 'recommended' && styles.warnCardMild,
+                  ]}
+                  onPress={() => fix(issue.key)}
+                >
+                  <Text style={styles.warnTitle}>
+                    {issue.severity === 'blocking' ? 'Required' : 'Recommended'} — {issue.title}
+                  </Text>
+                  <Text style={styles.warnText}>{issue.detail}</Text>
+                  <Text style={styles.warnAction}>{issue.action} ›</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {checked && issues.length === 0 && hasNativeCall && (
+            <View style={styles.okCard}>
+              <Text style={styles.okText}>
+                Ready — Android {readiness.release || readiness.sdkInt} · everything allowed
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
           {!hasNativeCall && (
             <View style={styles.warnCard}>
@@ -227,9 +255,16 @@ const styles = StyleSheet.create({
   armBtnTextActive: { color: '#2ecc71' },
   armHint: { color: '#555', fontSize: 12, marginTop: 10, lineHeight: 17 },
   warnCard: {
-    width: '100%', backgroundColor: '#1a1206', borderRadius: 12, padding: 16,
-    marginBottom: 20, borderWidth: 1, borderColor: '#4a3510',
+    width: '100%', backgroundColor: '#1a1206', borderColor: '#7a4a00',
+    borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 10,
   },
+  warnCardMild: { backgroundColor: '#0f1420', borderColor: '#2b4a7a' },
+  warnAction: { color: '#4a9eff', fontSize: 13, fontWeight: '700', marginTop: 8 },
+  okCard: {
+    width: '100%', backgroundColor: '#0b1a0f', borderColor: '#1f5c33',
+    borderWidth: 1, borderRadius: 10, padding: 12, marginBottom: 14,
+  },
+  okText: { color: '#5fd08a', fontSize: 13, textAlign: 'center' },
   warnTitle: { color: '#f0a020', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
   warnText: { color: '#b89050', fontSize: 13, lineHeight: 18 },
   footnote: { color: '#444', fontSize: 12, textAlign: 'center', fontStyle: 'italic' },

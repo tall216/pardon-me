@@ -53,6 +53,35 @@ keytool -printcert -jarfile app-release.aab | grep Owner
 5. Confirm the signer (above)
 6. Upload to the Play Console
 
+## Installing a release build on a test device
+
+The release build is signed with the upload key, which does **not** match the
+debug key used by earlier builds. `adb install -r` therefore fails with:
+
+```
+INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match previously
+installed version; ignoring!
+```
+
+Uninstall first:
+
+```bash
+adb uninstall com.davidevans.pardonme
+adb install android/app/build/outputs/apk/release/app-release.apk
+```
+
+> This failure is easy to miss if install output is piped to /dev/null: the
+> old build keeps running and every subsequent test silently measures stale
+> code. Always confirm the installed binary matches what you built:
+>
+> ```bash
+> adb shell md5sum $(adb shell pm path com.davidevans.pardonme | sed 's/package://')
+> md5sum android/app/build/outputs/apk/release/app-release.apk
+> ```
+>
+> Play Store updates are unaffected — Play re-signs with the app signing key,
+> so end users upgrade normally.
+
 ## Still required before the first submission
 
 - [ ] Publish the privacy policy at a public URL (`store/PRIVACY_POLICY.md`)

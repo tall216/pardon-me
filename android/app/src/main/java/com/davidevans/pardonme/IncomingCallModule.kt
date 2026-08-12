@@ -1,6 +1,8 @@
 package com.davidevans.pardonme
 
+import android.Manifest
 import android.app.AlarmManager
+import android.app.AppOpsManager
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -13,12 +15,16 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -44,6 +50,8 @@ class IncomingCallModule(private val reactContext: ReactApplicationContext) :
 
     companion object {
         private const val TAG = "PardonMeCall"
+        /** Request code for the Android 13+ notification permission dialog. */
+        private const val REQ_POST_NOTIFICATIONS = 7301
         // Bumped when channel settings change: channels are immutable once created.
         // v4: new telephone-bell ringtone.
         const val CHANNEL_ID = "pardonme_incoming_call_v4"
@@ -418,6 +426,292 @@ class IncomingCallModule(private val reactContext: ReactApplicationContext) :
         val caller = readPendingCaller(reactContext)
         setPendingCaller(reactContext, null)
         promise.resolve(caller)
+    }
+
+    /**
+     * Android 13+ (TIRAMISU) made notifications a runtime permission that is
+     * DENIED by default. Without it the app is completely silent — no ring, no
+     * call screen — which is the single biggest compatibility risk across the
+     * install base. Older versions grant it at install time.
+     */
+    @ReactMethod
+    fun hasNotificationPermission(promise: Promise) {
+        promise.resolve(notificationsAllowed())
+    }
+
+    /**
+     * Whether notifications will actually be seen and heard.
+     *
+     * Three independent things can silence this app, and no single API covers
+     * all of them:
+     *
+     *  1. The app-level notification switch. Normally reported by
+     *     `areNotificationsEnabled()` — but on some Samsung builds that returns
+     *     true even with the toggle off. The underlying OP_POST_NOTIFICATION
+     *     appop is accurate there, so it is checked directly via reflection
+     *     (the constant is hidden API, hence the string lookup and the
+     *     conservative fallback).
+     *  2. The ring channel being blocked or set to IMPORTANCE_NONE.
+     *  3. Android 13+ denying POST_NOTIFICATIONS at install.
+     *
+     * A false negative here is far worse than a false positive: it would tell
+     * the user everything is fine while the app cannot ring at all.
+     */
+    private fun notificationsAllowed(): Boolean = try {
+        val enabled = NotificationManagerCompat.from(reactContext).areNotificationsEnabled()
+        when {
+            !enabled -> false
+            !appOpNotificationsAllowed() -> false
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
+                ensureChannel(reactContext)
+                val nm = reactContext
+                    .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val channel = nm.getNotificationChannel(CHANNEL_ID)
+                channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+            }
+            else -> true
+        }
+    } catch (_: Exception) {
+        true
+    }
+
+    /**
+     * Reads OP_POST_NOTIFICATION, which reflects the OEM's own per-app
+     * notification switch even when the public API does not. Returns true when
+     * the op cannot be read, so an unknown state never blocks the app.
+     */
+    private fun appOpNotificationsAllowed(): Boolean = try {
+        val appOps = reactContext
+            .getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        val opField = AppOpsManager::class.java.getDeclaredField("OP_POST_NOTIFICATION")
+        opField.isAccessible = true
+        val op = opField.getInt(null)
+        val method = AppOpsManager::class.java.getMethod(
+            "checkOpNoThrow",
+            Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType,
+            String::class.java
+        )
+        val mode = method.invoke(
+            appOps, op, android.os.Process.myUid(), reactContext.packageName
+        ) as Int
+        mode == AppOpsManager.MODE_ALLOWED
+    } catch (_: Throwable) {
+        true
+    }
+
+    /**
+     * Ask for the notification permission. Must run against an Activity;
+     * falls back to opening app settings when the OS will no longer show the
+     * dialog (permanently denied) or when there is no activity to host it.
+     */
+    @ReactMethod
+    fun requestNotificationPermission(promise: Promise) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            promise.resolve(notificationsAllowed())
+            return
+        }
+        val activity = reactContext.currentActivity
+        if (activity == null) {
+            promise.resolve(false)
+            return
+        }
+        try {
+            if (notificationsAllowed()) {
+                promise.resolve(true)
+                return
+            }
+            ActivityCompat.requestPermissions(
+                activity,
+                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                REQ_POST_NOTIFICATIONS
+            )
+            // The dialog is async; JS re-checks on resume rather than waiting.
+            promise.resolve(false)
+        } catch (e: Exception) {
+            Log.w(TAG, "Notification permission request failed", e)
+            promise.resolve(false)
+        }
+    }
+
+    /** Opens this app's notification settings (permanently-denied fallback). */
+    @ReactMethod
+    fun openNotificationSettings(promise: Promise) {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, reactContext.packageName)
+                }
+            } else {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                }
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not open notification settings", e)
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * Battery optimisation is the main reason the trigger dies on Xiaomi,
+     * Huawei, OnePlus, Oppo and Vivo: their aggressive task killers stop the
+     * foreground service within minutes unless the app is exempted.
+     */
+    @ReactMethod
+    fun isBatteryOptimised(promise: Promise) {
+        promise.resolve(batteryOptimised())
+    }
+
+    private fun batteryOptimised(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+        return try {
+            val pm = reactContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+            // Assigned to a val rather than negated inline: a line starting
+            // with `!` directly after `as PowerManager` is parsed by Kotlin as
+            // a type modifier, not a negation, and fails to compile.
+            val exempt = pm.isIgnoringBatteryOptimizations(reactContext.packageName)
+            exempt.not()
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Send the user to the battery-optimisation screen. Deliberately uses the
+     * settings LIST rather than REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: Play
+     * restricts that permission to apps whose core function genuinely requires
+     * it, and requesting it is a common rejection reason. Opening settings
+     * needs no permission at all.
+     */
+    @ReactMethod
+    fun openBatterySettings(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            reactContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            // Not every OEM ships that screen; fall back to app details.
+            try {
+                val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(fallback)
+                promise.resolve(true)
+            } catch (e2: Exception) {
+                Log.w(TAG, "Could not open battery settings", e2)
+                promise.resolve(false)
+            }
+        }
+    }
+
+    /**
+     * Single source of truth for "will this app actually work on this phone".
+     *
+     * Every capability here is gated by a different OS version or OEM policy,
+     * so rather than have the UI guess, the native side reports the real state
+     * and JS renders whatever needs fixing.
+     */
+    @ReactMethod
+    fun getDeviceReadiness(promise: Promise) {
+        val map = Arguments.createMap()
+        try {
+            map.putInt("sdkInt", Build.VERSION.SDK_INT)
+            map.putString("release", Build.VERSION.RELEASE ?: "")
+            map.putString("manufacturer", Build.MANUFACTURER ?: "")
+            map.putString("model", Build.MODEL ?: "")
+
+            map.putBoolean("notifications", notificationsAllowed())
+            map.putBoolean(
+                "needsNotificationRequest",
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsAllowed()
+            )
+
+            // Android 14+ per-app full-screen-intent gate.
+            val fsi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                try {
+                    val nm = reactContext
+                        .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.canUseFullScreenIntent()
+                } catch (_: Exception) {
+                    true
+                }
+            } else true
+            map.putBoolean("fullScreenIntent", fsi)
+
+            // Android 12+ exact-alarm gate.
+            val exact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    val am = reactContext
+                        .getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                    am.canScheduleExactAlarms()
+                } catch (_: Exception) {
+                    false
+                }
+            } else true
+            map.putBoolean("exactAlarms", exact)
+
+            map.putBoolean("batteryOptimised", batteryOptimised())
+            map.putBoolean("aggressiveOem", isAggressiveOem())
+            map.putBoolean("stealthArmed", StealthTriggerService.isArmed)
+            promise.resolve(map)
+        } catch (e: Exception) {
+            Log.e(TAG, "Readiness check failed", e)
+            promise.resolve(map)
+        }
+    }
+
+    /**
+     * OEMs known to kill foreground services regardless of Android's own
+     * rules. These users need the extra battery-exemption prompt; everyone
+     * else should not be nagged. Matches the list maintained at
+     * dontkillmyapp.com.
+     */
+    private fun isAggressiveOem(): Boolean {
+        val m = (Build.MANUFACTURER ?: "").lowercase()
+        return m.contains("xiaomi") || m.contains("redmi") || m.contains("poco") ||
+            m.contains("huawei") || m.contains("honor") ||
+            m.contains("oppo") || m.contains("realme") ||
+            m.contains("vivo") || m.contains("iqoo") ||
+            m.contains("oneplus") || m.contains("meizu") ||
+            m.contains("asus") || m.contains("tecno") || m.contains("infinix")
+    }
+
+    /**
+     * Android 12+ requires the user to grant exact alarms in Settings.
+     * We open the screen rather than requesting the permission, because Play
+     * restricts USE_EXACT_ALARM to alarm/calendar-class apps.
+     */
+    @ReactMethod
+    fun openExactAlarmSettings(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(intent)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            // Some OEMs do not ship that screen; app details is always present.
+            try {
+                val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.parse("package:${reactContext.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                reactContext.startActivity(fallback)
+                promise.resolve(true)
+            } catch (e2: Exception) {
+                Log.w(TAG, "Could not open exact-alarm settings", e2)
+                promise.resolve(false)
+            }
+        }
     }
 
     /** Android 14+ gates full-screen intents behind a per-app setting. */
