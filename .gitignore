@@ -1,5 +1,7 @@
 # React Native / Expo
 node_modules/
+__pycache__/
+*.pyc
 .expo/
 dist/
 npm-debug.*
