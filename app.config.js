@@ -35,8 +35,8 @@ const config: ExpoConfig = {
     versionCode: 1,
     // Play requires new apps to target a recent API level; 34 is below the
     // current bar and the upload is rejected outright.
-    compileSdkVersion: 35,
-    targetSdkVersion: 35,
+    compileSdkVersion: 36,
+    targetSdkVersion: 36,
     // Android 12+ requires the full-screen-intent permission to be declared.
     permissions: [
       'POST_NOTIFICATIONS',
