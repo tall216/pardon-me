@@ -30,6 +30,9 @@ const config: ExpoConfig = {
   },
   android: {
     package: 'com.davidevans.pardonme',
+    // Bump for EVERY Play upload. Play permanently reserves each versionCode,
+    // so a number can never be reused — not even after a rollback.
+    versionCode: 1,
     // Android 12+ requires the full-screen-intent permission to be declared.
     permissions: [
       'POST_NOTIFICATIONS',

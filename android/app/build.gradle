@@ -101,15 +101,32 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Play Store upload key. Credentials live in android/keystore.properties
+        // which is gitignored; if that file is absent (fresh clone, CI without
+        // secrets) the release build falls back to debug signing so the project
+        // still builds — it just cannot be uploaded.
+        release {
+            def props = new Properties()
+            def propsFile = rootProject.file('keystore.properties')
+            if (propsFile.exists()) {
+                props.load(new FileInputStream(propsFile))
+                storeFile file(props['PARDONME_UPLOAD_STORE_FILE'])
+                storePassword props['PARDONME_UPLOAD_STORE_PASSWORD']
+                keyAlias props['PARDONME_UPLOAD_KEY_ALIAS']
+                keyPassword props['PARDONME_UPLOAD_KEY_PASSWORD']
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Use the upload key when its credentials are present, otherwise
+            // fall back to debug so a clone without secrets still compiles.
+            signingConfig rootProject.file('keystore.properties').exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
             shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
