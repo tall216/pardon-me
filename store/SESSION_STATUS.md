@@ -4,22 +4,34 @@ Last updated: 12 August 2026, actively recruiting testers
 
 ## Testing / recruiting — how to actually start
 
-**The opt-in link works NOW, before you have any testers.** It is tied to
-the testing track being live with a release (confirmed live: v3, alpha
-track, status completed) — NOT to how many people are already on the list.
-Send it to people as you recruit them; opt-ins accumulate. The 14-day clock
-starts once 12 have opted in, not before.
+**STATUS: email list created in Console with 6 testers as of this session.
+Opt-in link sent to them. Need 6 more to reach the 12 minimum.**
+
+**IMPORTANT correction learned this session: the Android Publisher API
+CANNOT manage testers for this track.** Attempted via `edits.testers` API,
+got `403 PERMISSION_DENIED`: "The alpha track has been upgraded to use
+open or closed testing; switch back to communities-based testing before
+using the API for this track." This is a real Google-side lock, not a bug
+on our end — newer closed-testing tracks are Console-UI-only for tester
+management. The Google Group (`pardon-me-testers@googlegroups.com`) that
+was created is NOT wired to anything and isn't usable here — testers must
+be added as a plain **email list** directly in:
+Console → Testing → Closed testing → track → Testers tab → Create email list.
+
+That's a manual step every time new testers are added — no API shortcut
+exists for this specific piece, confirmed by direct API error.
+
+The opt-in link works NOW, before 12 people are on it. It is tied to the
+testing track being live with a release (confirmed live: v3, alpha track,
+status completed) — NOT to headcount. Send it to people as you recruit
+them; opt-ins accumulate. The 14-day clock starts automatically once 12
+have opted in, not before, and resets if it drops below 12 during the
+window.
 
 Opt-in link for this app:
 ```
 https://play.google.com/apps/testing/com.davidevans.pardonme
 ```
-
-**One thing to verify in Console:** Testing → Closed testing → Testers tab.
-Check whether it's set to a specific email list vs. "anyone with the link."
-If it's locked to an email list, only people already on that list can
-actually complete opt-in even with the link in hand — tell me which mode
-it's in and I can check/change it via the API.
 
 Invite message drafted this session (copy-paste ready):
 ```
