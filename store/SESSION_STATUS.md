@@ -1,6 +1,89 @@
 # Play Store Submission Status — Pardon Me
 
-Last updated: 12 August 2026, session paused (user stepped away)
+Last updated: 12 August 2026, actively recruiting testers
+
+## Testing / recruiting — how to actually start
+
+**The opt-in link works NOW, before you have any testers.** It is tied to
+the testing track being live with a release (confirmed live: v3, alpha
+track, status completed) — NOT to how many people are already on the list.
+Send it to people as you recruit them; opt-ins accumulate. The 14-day clock
+starts once 12 have opted in, not before.
+
+Opt-in link for this app:
+```
+https://play.google.com/apps/testing/com.davidevans.pardonme
+```
+
+**One thing to verify in Console:** Testing → Closed testing → Testers tab.
+Check whether it's set to a specific email list vs. "anyone with the link."
+If it's locked to an email list, only people already on that list can
+actually complete opt-in even with the link in hand — tell me which mode
+it's in and I can check/change it via the API.
+
+Invite message drafted this session (copy-paste ready):
+```
+Hey — I built an Android app and need help testing it before it goes live
+on the Play Store. Takes about 5 minutes total.
+
+What it is: Pardon Me — triggers a realistic fake incoming call so you
+have a polite exit from awkward situations. No data collection, no ads,
+works fully offline.
+
+What I need from you:
+1. Click this link: https://play.google.com/apps/testing/com.davidevans.pardonme
+2. Tap "Become a tester" — needs a Google account (your normal Gmail works)
+3. Install it from the Play Store link that appears after
+4. Open it once, poke around for a minute — that's it
+
+I need you to stay opted in and keep the app installed for about 2 weeks
+while Google verifies real testers are using it. No ongoing work needed
+after the first open — just don't uninstall it. Thanks!
+```
+
+## Session log — things learned the hard way, for next time
+
+- **Play screenshot uploads fail SILENTLY in the browser** with no visible
+  error if the image has (a) an alpha channel, even fully opaque, or
+  (b) an aspect ratio over 2:1 (long side > 2x short side). Emulator
+  `screencap` output is RGBA at 1080x2400 (ratio 2.222) by default — both
+  violations. Always flatten to RGB and check ratio before uploading.
+- **The Android Publisher API can upload the entire store listing
+  directly** (title, descriptions, icon, feature graphic, screenshots) —
+  no browser needed, once a service account has "Manage store presence"
+  granted. See `store/push_listing_via_api.py`. The correct upload
+  endpoint path is `.../edits/{editId}/listings/{language}/{imageType}`
+  under the `/upload/` API root for POST, plain API root for DELETE — NOT
+  `.../images/{lang}/{type}` (guessed wrong twice before finding this via
+  Google's own API reference docs).
+- **This machine's MSYS git cannot handle EAS CLI's `file:///C:/...` clone
+  URIs** — `eas build` fails with a git-clone error unless run with
+  `EAS_NO_VCS=1` prefixed. Always use that env var for builds here.
+- **Two separate signing keystores exist for this app** — see the
+  dedicated section below. Only the EAS-managed one (via cloud `eas build`)
+  matches what Play Console already has on record. Local `gradlew
+  bundleRelease` produces a build Play will reject outright.
+- **Play's pre-launch report page (Test and release → Pre-launch report)
+  has no public API.** Confirmed via Google's own docs and third-party API
+  coverage trackers. Cannot be read programmatically — has to be
+  copy-pasted here when new warnings appear.
+- **The Play Developer Reporting API DOES exist** for production crash/ANR
+  data (`playdeveloperreporting.googleapis.com`) once the app has real
+  users — different from the pre-launch report and not yet wired up here,
+  but usable in future once out of closed testing.
+- **16 KB native library alignment**: confirmed via direct binary
+  inspection (`llvm-readelf -l` on the actual .so files inside the built
+  AAB) that libreactnative.so, libhermes.so, libexpo-modules-core.so, and
+  libexpo-av.so are all 0x1000 (4KB) aligned, not 0x4000 (16KB). Root
+  cause: React Native 0.76.9 — 16KB support only landed in RN 0.77+.
+  Fixing this requires an Expo SDK 52→53 upgrade (cascades to RN 0.79),
+  which is a real risk to the native volume-key/media-session code and
+  deserves its own dedicated testing pass, not a rushed fix. Deadline is
+  May 31, 2026 — real runway, not urgent tonight.
+- **Play requires 12 opted-in testers for 14 CONSECUTIVE days** before
+  production access unlocks (reduced from 20 in Dec 2024 — any guide
+  saying 20 is outdated). Applies to all personal developer accounts
+  created after Nov 13, 2023. Organization accounts are exempt.
 
 ## Done
 
