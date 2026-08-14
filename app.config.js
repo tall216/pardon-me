@@ -9,9 +9,15 @@
 //   * USE_FULL_SCREEN_INTENT lets the incoming-call UI show over the lock screen.
 //   * FOREGROUND_SERVICE + the notification channel keep Android from killing the
 //     listener while the phone is idle.
-import { ExpoConfig } from 'expo/config';
-
-const config: ExpoConfig = {
+//
+// NOTE: this file's extension is .js, not .ts — it must stay plain JavaScript.
+// `expo config` (and metro/babel-backed tooling) tolerate a TS type annotation
+// here via their own loader, but EAS Build's config reader parses it as plain
+// Node.js and throws "Missing initializer in const declaration" on `: ExpoConfig`.
+// Use the JSDoc @type annotation below for editor type-checking instead.
+//
+/** @type {import('expo/config').ExpoConfig} */
+const config = {
   name: 'Pardon Me',
   slug: 'pardon-me',
   version: '1.0.0',
@@ -27,6 +33,15 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'com.davidevans.pardonme',
+    // Matches Android's "everything the app needs, nothing it doesn't"
+    // stance: no camera/mic/location usage strings because none of those
+    // permissions are requested. Push (for VoIP) needs no Info.plist usage
+    // string — only the entitlement the plugin below sets.
+    infoPlist: {
+      UIBackgroundModes: ['voip', 'audio', 'remote-notifications'],
+      NSUserNotificationsUsageDescription: 'Pardon Me uses notifications to trigger fake calls.',
+      ITSAppUsesNonExemptEncryption: false,
+    },
   },
   android: {
     package: 'com.davidevans.pardonme',
@@ -74,6 +89,10 @@ const config: ExpoConfig = {
         importance: 'max',
       },
     ],
+    // CallKit/PushKit wiring — Info.plist UIBackgroundModes merge,
+    // aps-environment entitlement, ringtone.wav bundling. See
+    // ios-module/IncomingCall/ and IOS_PORT_PLAN.md.
+    './plugins/withIosCallKit.js',
   ],
   extra: {
     eas: {

@@ -1,0 +1,7 @@
+{
+  "name": "pardonme-incoming-call",
+  "version": "1.0.0",
+  "description": "Pardon Me — local iOS CallKit/PushKit native module, autolinked via react-native.config.js. Not published; consumed in-tree only.",
+  "private": true,
+  "main": "index.js"
+}

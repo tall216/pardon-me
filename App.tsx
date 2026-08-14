@@ -8,13 +8,16 @@ import {
   TextInput,
   StatusBar,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { OldPhoneIcon } from './src/OldPhoneIcon';
 import { FakeCallOverlay } from './src/FakeCallOverlay';
 import { useFakeCall, endCall, answerCall, triggerFakeCall, scheduleNativeCall, useNativeCallBridge, hasNativeCall } from './src/fakeCall';
 import { useDeviceReadiness } from './src/deviceReadiness';
 import { useStealthTrigger, syncCallerToNative } from './src/volumeListener';
+import { useDeepLinkTrigger } from './src/deepLinkTrigger';
 import { getCaller, setCaller, getPresets, addPreset, loadSavedProfile } from './src/CallerProfile';
+import { useDebugLog } from './src/debugLog';
 
 export default function App() {
   const call = useFakeCall();
@@ -29,6 +32,13 @@ export default function App() {
   // Raises the call UI when the app is opened by a call notification.
   useNativeCallBridge();
 
+  // Raises the call UI when the app is opened via pardonme://call — the
+  // path an iOS Back Tap Shortcut (or Home Screen icon, or Safari) uses to
+  // trigger a call without the app being open, working around the fact
+  // that volume-button capture (useStealthTrigger below) is foreground-only
+  // by hard Apple platform limit and cannot fire while backgrounded/locked.
+  useDeepLinkTrigger();
+
   useEffect(() => {
     (async () => {
       await loadSavedProfile();
@@ -38,6 +48,7 @@ export default function App() {
   }, []);
 
   const { armed, toggle } = useStealthTrigger(name);
+  const { lines: debugLines, clear: clearDebug } = useDebugLog();
 
   async function loadPresets() {
     const p = await getPresets();
@@ -157,10 +168,63 @@ export default function App() {
               </Text>
             </TouchableOpacity>
             <Text style={styles.armHint}>
-              {armed
-                ? 'Double-press either volume key to trigger a call. Works with the app closed or the phone locked.'
-                : 'Volume keys behave normally. No calls will trigger.'}
+              {Platform.OS === 'ios'
+                ? armed
+                  ? 'Double-press either volume key to trigger a call. iOS only allows this while Pardon Me is open in the foreground — it turns off automatically when you background or lock the phone.'
+                  : 'Volume keys behave normally. No calls will trigger. (iOS: foreground-only — see info below.)'
+                : armed
+                  ? 'Double-press either volume key to trigger a call. Works with the app closed or the phone locked.'
+                  : 'Volume keys behave normally. No calls will trigger.'}
             </Text>
+          </View>
+
+          {Platform.OS === 'ios' && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Back Tap Trigger (Works Locked)</Text>
+              <Text style={styles.armHint}>
+                Volume keys only work while this app is open (an Apple limit,
+                not a bug — there is no way around it). For a trigger that
+                works with the phone locked or the app closed, use Back Tap
+                instead. One-time setup, about a minute:
+              </Text>
+              <Text style={styles.setupStep}>1. Settings → Accessibility → Touch → Back Tap</Text>
+              <Text style={styles.setupStep}>2. Choose Double Tap (or Triple Tap)</Text>
+              <Text style={styles.setupStep}>3. Scroll down to Shortcuts → tap it</Text>
+              <Text style={styles.setupStep}>4. Create New Shortcut → add action "Open URLs"</Text>
+              <Text style={styles.setupStep}>5. Set the URL to: pardonme://call</Text>
+              <Text style={styles.setupStep}>6. Save — Back Tap now triggers a call, even locked.</Text>
+            </View>
+          )}
+
+          {/*
+            On-screen diagnostic log — this project has no Mac available to
+            watch Xcode's device console, and idevicesyslog (the Windows
+            workaround) does not detect this device over USB. This panel
+            shows the exact sequence of events live on the phone itself:
+            tap Arm, watch for "native resolved", press a volume button,
+            watch for "PRESS: PardonMeVolumePressed received". Whatever line
+            is the LAST one to appear tells you exactly which step failed.
+          */}
+          <View style={styles.card}>
+            <View style={styles.debugHeader}>
+              <Text style={styles.cardTitle}>Debug Log</Text>
+              <TouchableOpacity onPress={clearDebug}>
+                <Text style={styles.debugClear}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+            {debugLines.length === 0 ? (
+              <Text style={styles.debugEmpty}>
+                Nothing logged yet. Tap the Stealth Trigger button above, then press a volume key.
+              </Text>
+            ) : (
+              <ScrollView style={styles.debugScroll} nestedScrollEnabled>
+                {debugLines.map((line, i) => (
+                  <Text key={i} style={styles.debugLine} selectable>
+                    {line}
+                  </Text>
+                ))}
+              </ScrollView>
+            )}
           </View>
 
           <View style={styles.footer}>
@@ -254,6 +318,7 @@ const styles = StyleSheet.create({
   armBtnText: { color: '#888', fontSize: 14, fontWeight: '600' },
   armBtnTextActive: { color: '#2ecc71' },
   armHint: { color: '#555', fontSize: 12, marginTop: 10, lineHeight: 17 },
+  setupStep: { color: '#7fa8d0', fontSize: 12, marginTop: 8, lineHeight: 17, fontFamily: 'Courier' },
   warnCard: {
     width: '100%', backgroundColor: '#1a1206', borderColor: '#7a4a00',
     borderWidth: 1, borderRadius: 10, padding: 14, marginBottom: 10,
@@ -268,4 +333,9 @@ const styles = StyleSheet.create({
   warnTitle: { color: '#f0a020', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
   warnText: { color: '#b89050', fontSize: 13, lineHeight: 18 },
   footnote: { color: '#444', fontSize: 12, textAlign: 'center', fontStyle: 'italic' },
+  debugHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  debugClear: { color: '#4a9eff', fontSize: 12, fontWeight: '600' },
+  debugEmpty: { color: '#444', fontSize: 12, lineHeight: 17, fontStyle: 'italic' },
+  debugScroll: { maxHeight: 220 },
+  debugLine: { color: '#7fd88f', fontSize: 11, fontFamily: 'Courier', lineHeight: 16, marginBottom: 2 },
 });

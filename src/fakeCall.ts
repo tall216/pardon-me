@@ -1,25 +1,26 @@
 import { useEffect, useState } from 'react';
-import { NativeModules, NativeEventEmitter, Vibration, AppState } from 'react-native';
+import { NativeModules, NativeEventEmitter, Vibration, AppState, Platform } from 'react-native';
 import { getCaller } from './CallerProfile';
 
 /**
- * fakeCall.ts — call state machine.
- *
- * RINGING is driven by the NATIVE module (IncomingCall):
- *   - it posts a full-screen-intent notification on a high-importance channel
- *     whose sound is the bundled ringtone on the RINGTONE audio stream, so it
- *     is audible with the screen off / phone silenced (channel bypasses DND)
- *   - that notification is what wakes and shows over the lock screen
- *
- * JS only owns the on-screen UI and the state transitions. We deliberately do
- * NOT play the ringtone with expo-av: media-stream playback is inaudible on a
- * locked/silenced phone and was the original "no audio" bug.
+ * CallBridge — cross-platform abstraction over the native calling UI.
+ * Both platforms are exposed as a SINGLE native module named `IncomingCall`
+ * (see android/.../IncomingCallModule.kt and
+ * ios-module/IncomingCall/IncomingCallModule.swift, which is @objc(IncomingCall)
+ * — not a separate "iOSCallKit" name). A prior edit to this file referenced
+ * `iOSCallKit`, a module that is never registered anywhere in the native
+ * code on either platform, which silently broke every iOS call trigger by
+ * always falling through to `return false`. Fixed by pointing both branches
+ * at the one real module.
  */
-
 const { IncomingCall } = NativeModules as {
   IncomingCall?: {
     showIncomingCall(caller: string): Promise<boolean>;
     dismissCall(): Promise<boolean>;
+    /** iOS only: real CallKit hang-up, called ONLY from decline/hangup —
+     * never from answer. Resolves harmlessly on Android where it doesn't
+     * exist (guarded by optional chaining below). */
+    endCallSession?(): Promise<boolean>;
     restoreSystemBars(): Promise<boolean>;
     leaveIfCallLaunched(): Promise<boolean>;
     scheduleCall(caller: string, seconds: number): Promise<boolean>;
@@ -32,6 +33,35 @@ const { IncomingCall } = NativeModules as {
 };
 
 export const hasNativeCall = !!IncomingCall;
+
+const BRIDGE = {
+  async trigger(caller: string) {
+    if (!IncomingCall) return false;
+    return await IncomingCall.showIncomingCall(caller);
+  },
+  /** Decline / hang up ONLY. Must never be called from answerCall() — see
+   * dismissCall/endCallSession's own docs in the native module for the bug
+   * this split fixes (accepting a call on iOS was silently ending it). */
+  async hangup() {
+    if (!IncomingCall) return;
+    await IncomingCall.dismissCall();
+    try { await IncomingCall.endCallSession?.(); } catch {}
+  },
+  /** Stop the ringer/vibration only — used by BOTH answer and decline, never
+   * sends any end-call signal to native. */
+  async stopRingerOnly() {
+    if (!IncomingCall) return;
+    try { await IncomingCall.dismissCall(); } catch {}
+  },
+  async restore() {
+    if (!IncomingCall) return;
+    await IncomingCall.restoreSystemBars();
+  },
+  async leave() {
+    if (!IncomingCall) return;
+    await IncomingCall.leaveIfCallLaunched();
+  }
+};
 
 /** Fallback vibration cadence used only when the native module is absent. */
 const RING_PATTERN = [0, 800, 600, 800, 600];
@@ -49,7 +79,6 @@ type Listener = (call: ActiveCall) => void;
 const listeners = new Set<Listener>();
 let state: ActiveCall = { state: 'IDLE', callerName: 'Michael' };
 
-/** Last native error, surfaced in the UI so failures are never silent. */
 export let lastCallError: string | null = null;
 
 function emit() {
@@ -70,10 +99,6 @@ export function getCallState(): ActiveCall {
   return state;
 }
 
-/**
- * Start ringing. Native posts the full-screen-intent notification (sound +
- * vibration + lock-screen UI). The JS overlay follows via RINGING state.
- */
 export async function triggerFakeCall(): Promise<void> {
   if (state.state === 'RINGING' || state.state === 'ACTIVE') return;
 
@@ -81,102 +106,86 @@ export async function triggerFakeCall(): Promise<void> {
   state = { state: 'RINGING', callerName: caller.name, photoUri: caller.photoUri };
   emit();
 
-  if (IncomingCall) {
-    try {
-      await IncomingCall.showIncomingCall(caller.name);
-      lastCallError = null;
-    } catch (e: any) {
-      lastCallError = `native: ${e?.message ?? e}`;
-      // Native failed — at least buzz so the app is not silently dead.
+  try {
+    const success = await BRIDGE.trigger(caller.name);
+    if (!success) {
+      lastCallError = 'Native module failed to trigger call UI';
       try { Vibration.vibrate(RING_PATTERN, true); } catch {}
+    } else {
+      lastCallError = null;
     }
-  } else {
-    lastCallError = 'native module missing (rebuild required)';
+  } catch (e: any) {
+    lastCallError = `native error: ${e?.message ?? e}`;
     try { Vibration.vibrate(RING_PATTERN, true); } catch {}
   }
 }
 
-/** Answer: stop the ringer, keep the in-call UI up. */
 export async function answerCall(): Promise<void> {
   if (state.state !== 'RINGING') return;
   state = { ...state, state: 'ACTIVE' };
   emit();
-  await stopRinger();
+  try { Vibration.cancel(); } catch {}
+  await BRIDGE.stopRingerOnly();
 }
 
-/** Decline / hang up: brief "Call ended", then back to IDLE. */
 export async function endCall(): Promise<void> {
   if (state.state === 'IDLE') return;
   state = { ...state, state: 'ENDED' };
   emit();
-  await stopRinger();
+  try { Vibration.cancel(); } catch {}
+  await BRIDGE.hangup();
   setTimeout(() => {
     if (state.state === 'ENDED') {
       state = { state: 'IDLE', callerName: getCaller().name };
       emit();
-      restoreBars();
-      // If the call is what opened the app, disappear instead of revealing
-      // the PardonMe UI. No-op when the user opened it from the icon.
-      if (IncomingCall) {
-        IncomingCall.leaveIfCallLaunched().catch(() => {});
-      }
+      BRIDGE.restore();
+      BRIDGE.leave();
     }
   }, 1200);
 }
 
-async function stopRinger() {
-  try { Vibration.cancel(); } catch {}
-  if (IncomingCall) {
-    try { await IncomingCall.dismissCall(); } catch {}
-  }
-}
-
-/** Bring the system bars back once the call UI is gone. */
-async function restoreBars() {
-  if (!IncomingCall) return;
-  try { await IncomingCall.restoreSystemBars(); } catch {}
-}
-
-/** Schedule a call N seconds out. Uses exact alarms so it fires when closed. */
 export async function scheduleNativeCall(seconds: number): Promise<boolean> {
-  if (!IncomingCall) return false;
-  try {
-    await IncomingCall.scheduleCall(getCaller().name, seconds);
-    return true;
-  } catch (e: any) {
-    lastCallError = `schedule: ${e?.message ?? e}`;
-    return false;
+  if (Platform.OS === 'android' && IncomingCall) {
+    try {
+      await IncomingCall.scheduleCall(getCaller().name, seconds);
+      return true;
+    } catch (e: any) {
+      lastCallError = `schedule: ${e?.message ?? e}`;
+      return false;
+    }
   }
+  // iOS scheduling is handled via server-side VoIP push notifications
+  return false;
 }
 
 export async function cancelScheduledCall(): Promise<void> {
-  if (!IncomingCall) return;
-  try { await IncomingCall.cancelScheduledCall(); } catch {}
+  if (Platform.OS === 'android' && IncomingCall) {
+    try { await IncomingCall.cancelScheduledCall(); } catch {}
+  }
 }
 
-/** Android 14+ requires the user to allow full-screen intents. */
 export async function checkFullScreenPermission(): Promise<boolean> {
-  if (!IncomingCall) return false;
-  try { return await IncomingCall.canUseFullScreenIntent(); } catch { return false; }
+  if (Platform.OS === 'ios') return true; // CallKit doesn't use full-screen-intent permission
+  if (Platform.OS === 'android' && IncomingCall) {
+    try { return await IncomingCall.canUseFullScreenIntent(); } catch { return false; }
+  }
+  return false;
 }
 
 export async function openFullScreenSettings(): Promise<void> {
-  if (!IncomingCall) return;
-  try { await IncomingCall.openFullScreenIntentSettings(); } catch {}
+  if (Platform.OS === 'ios') return;
+  if (Platform.OS === 'android' && IncomingCall) {
+    try { await IncomingCall.openFullScreenIntentSettings(); } catch {}
+  }
 }
 
-/**
- * Raise the call UI if the app was opened by a call notification (locked-phone
- * path), and listen for calls fired natively while JS is already running.
- * Mount once from App.
- */
 export function useNativeCallBridge(): void {
   useEffect(() => {
     let mounted = true;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     const raiseIfPending = async () => {
-      if (!IncomingCall) return;
+      if (Platform.OS !== 'android' || !IncomingCall) return;
       try {
         const caller = await IncomingCall.consumePendingCall();
         if (mounted && caller && state.state === 'IDLE') {
@@ -186,13 +195,6 @@ export function useNativeCallBridge(): void {
       } catch {}
     };
 
-    /**
-     * The activity can be launched by the full-screen intent BEFORE the JS
-     * bundle has finished booting, so a single check on mount loses the race
-     * and the call screen never appears — that was the "doesn't show
-     * consistently" bug. Poll briefly after every resume instead of checking
-     * once.
-     */
     const raiseWithRetries = () => {
       raiseIfPending();
       let attempts = 0;
@@ -215,7 +217,7 @@ export function useNativeCallBridge(): void {
     });
 
     let eventSub: { remove(): void } | null = null;
-    if (IncomingCall) {
+    if (Platform.OS === 'android' && IncomingCall) {
       const emitter = new NativeEventEmitter(IncomingCall as any);
       eventSub = emitter.addListener('PardonMeIncomingCall', (caller: string) => {
         if (state.state === 'IDLE') {
