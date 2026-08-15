@@ -10,13 +10,24 @@
     "preview": {
       "distribution": "internal"
     },
-    "production": {}
+    "production": {
+      "ios": {
+        "image": "macos-sequoia-15.6-xcode-26.2"
+      }
+    }
   },
   "submit": {
     "production": {
       "android": {
         "serviceAccountKeyPath": "./android/credentials/play-service-account.json",
         "track": "internal"
+      },
+      "ios": {
+        "appleTeamId": "N2C7B97A76",
+        "ascAppId": "6793767985",
+        "ascApiKeyPath": "./ios/credentials/AuthKey_CJ66MD2PJ6.p8",
+        "ascApiKeyId": "CJ66MD2PJ6",
+        "ascApiKeyIssuerId": "79329414-a921-49f4-9709-d23b5df6e680"
       }
     }
   }

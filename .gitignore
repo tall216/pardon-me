@@ -41,3 +41,5 @@ ios/Pods/
 *.log
 # throwaway device screenshots from debugging sessions
 _*.png
+
+credentials.json

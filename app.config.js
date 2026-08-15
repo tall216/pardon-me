@@ -38,7 +38,7 @@ const config = {
     // permissions are requested. Push (for VoIP) needs no Info.plist usage
     // string — only the entitlement the plugin below sets.
     infoPlist: {
-      UIBackgroundModes: ['voip', 'audio', 'remote-notifications'],
+      UIBackgroundModes: ['voip', 'audio', 'remote-notification'],
       NSUserNotificationsUsageDescription: 'Pardon Me uses notifications to trigger fake calls.',
       ITSAppUsesNonExemptEncryption: false,
     },
