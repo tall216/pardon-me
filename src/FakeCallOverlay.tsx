@@ -33,9 +33,11 @@ export function FakeCallOverlay({ callerName, photoUri, callState = 'RINGING', o
    * navigation bar when the overlay unmounts.
    */
   useEffect(() => {
+    // SDK 57: setBehaviorAsync/setBackgroundColorAsync were removed from
+    // expo-navigation-bar (edge-to-edge is always on in RN 0.86 Android;
+    // behavior/color are controlled by the system). Hiding the bar is all
+    // we still need — swipe reveals it temporarily by default.
     NavigationBar.setVisibilityAsync('hidden').catch(() => {});
-    NavigationBar.setBehaviorAsync('overlay-swipe').catch(() => {});
-    NavigationBar.setBackgroundColorAsync('#000000').catch(() => {});
     return () => {
       NavigationBar.setVisibilityAsync('visible').catch(() => {});
     };
@@ -195,7 +197,13 @@ const fontScale = PixelRatio.getFontScale();
 
 const styles = StyleSheet.create({
   root: {
-    ...StyleSheet.absoluteFillObject,
+    // SDK 57 / RN 0.86: absoluteFillObject (the spread-friendly object) was
+    // dropped from the StyleSheet type; spell out the same four edges.
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#000',
     zIndex: 9999,
     elevation: 9999,
