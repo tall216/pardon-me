@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { NativeModules, NativeEventEmitter, AppState } from 'react-native';
 import { triggerFakeCall } from './fakeCall';
 import { debugLog } from './debugLog';
@@ -123,9 +123,23 @@ export async function isStealthArmed(): Promise<boolean> {
  */
 export function useStealthTrigger(callerName?: string) {
   const [armed, setArmed] = useState(false);
+  // The user's INTENT, as opposed to `armed` (the native module's actual
+  // state). Native auto-disarms every time the app leaves the foreground
+  // (see VolumeButtonTrigger.swift) — including when our own CallKit UI
+  // takes over. Result before this fix: triggering a call disarmed the
+  // trigger, so it "worked once per arm". We now remember the intent and
+  // silently re-arm on every return to foreground while intent is on.
+  const wantArmed = useRef(false);
 
   const refresh = useCallback(async () => {
-    setArmed(await isStealthArmed());
+    const actual = await isStealthArmed();
+    if (wantArmed.current && !actual) {
+      debugLog('auto-rearm: intent is armed but native disarmed (backgrounding/call) — re-arming');
+      const ok = await armStealthTrigger();
+      setArmed(ok ? await isStealthArmed() : false);
+      return;
+    }
+    setArmed(actual);
   }, []);
 
   useEffect(() => {
@@ -171,8 +185,10 @@ export function useStealthTrigger(callerName?: string) {
 
   const toggle = useCallback(async () => {
     if (armed) {
+      wantArmed.current = false;
       await disarmStealthTrigger();
     } else {
+      wantArmed.current = true;
       await armStealthTrigger();
     }
     // Service state flips asynchronously; give it a beat before re-reading.
