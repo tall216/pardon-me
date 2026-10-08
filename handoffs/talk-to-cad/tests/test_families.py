@@ -2,7 +2,7 @@
 
 talk_to_cad.build.build_part(spec: dict, out_dir: str, bed: float = 260) -> dict
 must write spec.json, part.stl and part.3mf into out_dir and return a dict with
-those three paths under keys "spec", "stl", "3mf".  The mesh must satisfy
+those three paths under keys "spec", "stl", "3mf" plus "fits_bed": bool.  The mesh must satisfy
 checks/check_mesh.py (bbox, origin, single watertight body, analytic volume,
 hole sections, bed fit, 3MF round trip).  Test ids contain the family name so
 `-k plate` etc. selects one family.
@@ -52,9 +52,13 @@ def test_family_geometry(tmp_path, name, spec):
     assert not errs, "\n".join(errs)
 
 
-def test_bed_fit_is_enforced(tmp_path):
+def test_bed_fit_is_reported_not_enforced(tmp_path):
+    """Oversize parts are still exported (David shrinks in the slicer); fits_bed must say so."""
     spec = {"spec_version": 1, "family": "plate", "name": "too_big",
             "dims": {"length": 300, "width": 20, "thickness": 2}}
-    with pytest.raises(Exception) as ei:
-        build_part(spec, str(tmp_path / "big"), bed=260)
-    assert "bed" in str(ei.value).lower()
+    paths = build_part(spec, str(tmp_path / "big"), bed=260)
+    assert paths["fits_bed"] is False
+    assert os.path.exists(paths["stl"]) and os.path.exists(paths["3mf"])
+    ok = build_part({"spec_version": 1, "family": "plate", "name": "small",
+                     "dims": {"length": 30, "width": 20, "thickness": 2}}, str(tmp_path / "small"), bed=260)
+    assert ok["fits_bed"] is True

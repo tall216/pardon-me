@@ -5,7 +5,7 @@ David describes a simple functional part in plain English (typed, or dictated wi
 Win+H into the same prompt) and the local pipeline produces, with no cloud calls:
 
 - `out/<stamp>_<name>/spec.json`  — the exact dimensions the model understood
-- `out/<stamp>_<name>/part.stl` and `part.3mf` — solid, watertight, fits the K2 bed
+- `out/<stamp>_<name>/part.stl` and `part.3mf` — solid, watertight; warns if over the K2 bed
 - `out/<stamp>_<name>/preview.png` — isometric render with the dimensions printed on it
 
 David opens the STL/3MF in Creality Print himself. No printer connection, ever.
@@ -112,8 +112,9 @@ Conventions:
   validate() returns a NEW dict (deep copy); never mutate the caller's spec.
   build_part(): validate -> families.build -> cq.exporters.export(wp, stl, tolerance=0.01,
   angularTolerance=0.1) -> trimesh.load(stl).export(3mf) -> write spec.json (the validated spec).
-  Bed fit: every bbox extent must be <= bed - 10 (5 mm margin each side) else raise ValueError
-  containing the word "bed". Default bed = env TALK_TO_CAD_BED_MM or 260.
+  Bed fit: fits_bed = every bbox extent <= bed - 10 (5 mm margin each side). NEVER refuse an
+  oversize part: still export, return "fits_bed": False, and the CLI prints a WARNING line
+  (David shrinks in Creality Print). Default bed = env TALK_TO_CAD_BED_MM or 260 (base K2).
   CadQuery: use workplane(centerOption="ProjectedOrigin") so hole coordinates are global XY.
   Bracket holes: cut with explicit cylinders (Workplane("XY") for leg A, Workplane("YZ") for
   leg B, local centre (y, x)) — do not rely on face selection.
@@ -139,7 +140,6 @@ judgment: big gear, so the 5090 must be free for those two (`brain_mode.py big`,
 ## Assumptions Claude made (David: confirm or fix before `handoff.py run`)
 - WORKDIR path above, and that `workdir` is the jobs.json key handoff.py expects
   (compare with the skeleton `handoff.py new` writes and merge if the keys differ).
-- Base-model K2 (260 mm bed). For a K2 Pro set TALK_TO_CAD_BED_MM=300, K2 Plus 350.
 - The Hermes venv's `python` is what the runner uses for verify commands.
 - Runtime LLM for the finished tool: main Ollama at http://127.0.0.1:11434/v1/chat/completions.
   Set TALK_TO_CAD_LLM_MODEL to the Ollama tag you want the tool to use day to day (the small

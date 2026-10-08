@@ -5,7 +5,8 @@ OUT_DIR must contain spec.json, part.stl, part.3mf.  Exit 0 only if every
 check passes; prints one line per failure.
 
 Checks: bbox extents and position, watertight single body, analytic volume,
-section cuts (hole count, diameter, position), bed fit, 3MF round-trip.
+section cuts (hole count, diameter, position), 3MF round-trip. Bed fit is a
+warning unless --strict-bed is given.
 """
 import argparse
 import json
@@ -57,7 +58,7 @@ def _ring_diameter_center(ring):
     return ext, (mn + mx) / 2.0
 
 
-def check_mesh_file(stl_path, spec, bed=DEFAULT_BED, margin=DEFAULT_MARGIN, threemf_path=None):
+def check_mesh_file(stl_path, spec, bed=DEFAULT_BED, margin=DEFAULT_MARGIN, threemf_path=None, strict_bed=False):
     errors = []
     mesh = trimesh.load(stl_path, force="mesh")
     if mesh.is_empty or len(mesh.faces) == 0:
@@ -120,10 +121,14 @@ def check_mesh_file(stl_path, spec, bed=DEFAULT_BED, margin=DEFAULT_MARGIN, thre
             else:
                 unmatched.pop(best)
 
-    # --- bed fit -----------------------------------------------------------
+    # --- bed fit (warning only: David shrinks oversize parts in the slicer) ----
     usable = bed - 2 * margin
     if any(e > usable + 1e-6 for e in ext):
-        errors.append(f"does not fit bed: extents {ext.round(2).tolist()} > usable {usable} mm")
+        msg = f"does not fit bed: extents {ext.round(2).tolist()} > usable {usable} mm"
+        if strict_bed:
+            errors.append(msg)
+        else:
+            print("  WARNING " + msg)
 
     # --- 3MF round trip ----------------------------------------------------
     if threemf_path is not None:
@@ -141,7 +146,7 @@ def check_mesh_file(stl_path, spec, bed=DEFAULT_BED, margin=DEFAULT_MARGIN, thre
     return errors
 
 
-def check_out_dir(out_dir, bed=DEFAULT_BED, margin=DEFAULT_MARGIN):
+def check_out_dir(out_dir, bed=DEFAULT_BED, margin=DEFAULT_MARGIN, strict_bed=False):
     spec_p = os.path.join(out_dir, "spec.json")
     stl_p = os.path.join(out_dir, "part.stl")
     mf_p = os.path.join(out_dir, "part.3mf")
@@ -150,7 +155,7 @@ def check_out_dir(out_dir, bed=DEFAULT_BED, margin=DEFAULT_MARGIN):
         return [f"missing file: {p}" for p in missing]
     with open(spec_p, encoding="utf-8") as f:
         spec = json.load(f)
-    return check_mesh_file(stl_p, spec, bed=bed, margin=margin, threemf_path=mf_p)
+    return check_mesh_file(stl_p, spec, bed=bed, margin=margin, threemf_path=mf_p, strict_bed=strict_bed)
 
 
 def main(argv=None):
@@ -158,8 +163,9 @@ def main(argv=None):
     ap.add_argument("out_dir")
     ap.add_argument("--bed", type=float, default=DEFAULT_BED)
     ap.add_argument("--margin", type=float, default=DEFAULT_MARGIN)
+    ap.add_argument("--strict-bed", action="store_true", help="fail (not warn) when the part exceeds the bed")
     a = ap.parse_args(argv)
-    errs = check_out_dir(a.out_dir, a.bed, a.margin)
+    errs = check_out_dir(a.out_dir, a.bed, a.margin, strict_bed=a.strict_bed)
     if errs:
         print(f"FAIL {a.out_dir}")
         for e in errs:
