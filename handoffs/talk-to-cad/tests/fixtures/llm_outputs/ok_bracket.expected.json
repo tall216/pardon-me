@@ -1,0 +1,2 @@
+{"family": "bracket", "dims": {"leg_a": 40, "leg_b": 40, "width": 20, "thickness": 3},
+ "holes_a": [{"d": 4.5, "x": 25, "y": 10}], "holes_b": [{"d": 4.5, "x": 25, "y": 10}]}

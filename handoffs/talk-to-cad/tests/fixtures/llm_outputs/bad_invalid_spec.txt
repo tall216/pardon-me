@@ -1,0 +1,1 @@
+{"spec_version": 1, "family": "sphere", "name": "ball", "dims": {"d": 20}}

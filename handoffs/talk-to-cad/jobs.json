@@ -1,0 +1,161 @@
+{
+  "project": "talk-to-cad",
+  "workdir": "C:\\Users\\david\\hermes-work\\talk-to-cad",
+  "stop_on_block": true,
+  "notes": "Written by Claude 2026-10-08. Verify commands run in workdir with the Hermes venv active. Set TALK_TO_CAD_BED_MM, TALK_TO_CAD_LLM_URL, TALK_TO_CAD_LLM_MODEL before `handoff.py run`. Expected 3-5 h; J08 and J09 need big gear (5090 busy).",
+  "jobs": [
+    {
+      "id": "J01",
+      "title": "Environment and skeleton",
+      "gear": "small",
+      "depends_on": [],
+      "max_minutes": 20,
+      "task": "Goal\nWORKDIR exists with the package skeleton, the Claude-written tests/ and checks/ copied in unchanged, and every library importable.\n\nFacts (already verified)\nWORKDIR = C:\\Users\\david\\hermes-work\\talk-to-cad. HANDOFF = C:\\Users\\david\\hermes-work\\handoffs\\talk-to-cad. PLAN.md 'Context for workers' lists the layout.\nCadQuery, trimesh, SolidPython are already installed in the Hermes venv. trimesh's section and 3MF code needs extras.\n\nDo\n1. Create WORKDIR if missing. Inside it create: talk_to_cad/__init__.py (empty), talk_to_cad/families/__init__.py (empty), out/.gitkeep.\n2. Copy the folders C:\\Users\\david\\hermes-work\\handoffs\\talk-to-cad\\checks and C:\\Users\\david\\hermes-work\\handoffs\\talk-to-cad\\tests into WORKDIR (same names, all files, including tests/fixtures).\n3. pip install \"trimesh[easy]\" pillow pytest   (in the Hermes venv).\n4. Write WORKDIR/README.md: 10 lines max, what the project is and the three commands from PLAN.md (run CLI, run tests, run golden).\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python -c \"import cadquery, trimesh, shapely, scipy, networkx, rtree, lxml, PIL, numpy, pytest; print('imports ok')\"",
+        "python checks/verify_untouched.py",
+        "python -c \"import talk_to_cad, talk_to_cad.families; print('package ok')\"",
+        "python -c \"import os; assert os.path.isdir('out'); assert os.path.isfile('README.md')\""
+      ]
+    },
+    {
+      "id": "J02",
+      "title": "spec.py: schema, defaults, validate",
+      "gear": "small",
+      "depends_on": [
+        "J01"
+      ],
+      "max_minutes": 40,
+      "task": "Goal\ntalk_to_cad/spec.py passes tests/test_spec.py: FAMILIES, DEFAULTS, SpecError(.missing), validate(spec) -> new normalized dict.\n\nFacts (already verified)\nThe schema, required dims, defaults and rejection rules are in PLAN.md 'Spec schema v1' and 'Coordinate conventions'.\ntests/test_spec.py is the exact contract; read it first. checks/golden.json has 8 specs that must validate unchanged.\n\nDo\n1. Read tests/test_spec.py and PLAN.md spec section.\n2. Write talk_to_cad/spec.py:\n   FAMILIES = (\"plate\",\"cylinder\",\"washer\",\"box\",\"bracket\")\n   DEFAULTS = {\"plate\": {\"corner_radius\": 0}, \"cylinder\": {\"inner_d\": 0}, \"washer\": {}, \"box\": {\"wall\": 2.4}, \"bracket\": {}}\n   class SpecError(ValueError) with attribute .missing (list of missing required dim names, [] otherwise).\n   validate(spec): deep-copy input; check family; require a non-empty string name and normalise it to snake_case\n   (lowercase, runs of non [a-z0-9] -> '_', strip '_'); require all required dims (raise SpecError with .missing listing\n   ALL missing names); coerce dims to float, reject bool/str; fill defaults; box.floor defaults to wall; reject\n   non-positive dims (corner_radius and cylinder.inner_d may be 0); apply every rejection rule in PLAN.md; normalise hole\n   lists (plate: holes; bracket: holes_a, holes_b; always present as lists, each entry {d, x, y} floats, d > 0, fully on\n   its face, bracket holes clear of the corner: x - d/2 >= thickness). Return {\"spec_version\": 1, \"family\", \"name\", \"dims\", holes...}.\n3. Run python -m pytest tests/test_spec.py -q until green.\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -m pytest tests/test_spec.py -q -p no:cacheprovider"
+      ]
+    },
+    {
+      "id": "J03",
+      "title": "build.py + plate family + STL/3MF export",
+      "gear": "small",
+      "depends_on": [
+        "J02"
+      ],
+      "max_minutes": 45,
+      "task": "Goal\nbuild_part() exists and the plate family passes its geometry tests, including bed fit.\n\nFacts (already verified)\ntests/test_families.py defines build_part(spec, out_dir, bed=260.0) -> {\"spec\",\"stl\",\"3mf\"}; test ids containing 'plate' are the targets.\nchecks/check_mesh.py is what the test runs on the output: bbox within 0.05 mm, part centred in XY sitting on Z=0,\nsingle watertight body, volume within 1% of analytic, mid-plane section finds every hole at the right place and diameter, 3MF volume == STL volume.\nCadQuery: Workplane(\"XY\").box(L, W, T, centered=(True, True, False)) gives a centred box on Z=0.\nFillets on vertical edges: .edges(\"|Z\").fillet(r). Holes: for each hole,\nwp = wp.faces(\">Z\").workplane(centerOption=\"ProjectedOrigin\").pushPoints([(x, y)]).hole(d)  (hole() cuts through everything).\nExport: from cadquery import exporters; exporters.export(wp, stl_path, exportType=\"STL\", tolerance=0.01, angularTolerance=0.1)\nthen trimesh.load(stl_path, force=\"mesh\").export(mf_path)  writes the 3MF from the same tessellation.\n\nDo\n1. Write talk_to_cad/families/plate.py with build(spec) -> cq.Workplane per the facts above.\n2. Write talk_to_cad/families/__init__.py: build(spec) imports the family module by name and calls its build(spec).\n   Raise ValueError for an unknown family.\n3. Write talk_to_cad/build.py: build_part(spec, out_dir, bed=None):\n   bed = bed or float(os.environ.get(\"TALK_TO_CAD_BED_MM\", \"260\")); spec = validate(spec); wp = families.build(spec);\n   os.makedirs(out_dir, exist_ok=True); export STL then 3MF as in the facts; load the STL with trimesh and if any\n   bounding-box extent > bed - 10 raise ValueError(f\"part does not fit the bed: ...\") (the word 'bed' must appear);\n   write spec.json (the validated spec, indent=1); return the three paths.\n4. python -m pytest tests/test_families.py -k \"plate or bed\" -q until green. Use the failure text from check_mesh:\n   it names the exact measurement that is off.\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -m pytest tests/test_families.py -k \"plate or bed\" -q -p no:cacheprovider"
+      ]
+    },
+    {
+      "id": "J04",
+      "title": "cylinder and washer families",
+      "gear": "small",
+      "depends_on": [
+        "J03"
+      ],
+      "max_minutes": 30,
+      "task": "Goal\ncylinder (solid or tube) and washer pass their geometry tests.\n\nFacts (already verified)\nAxis Z, centred in XY, sitting on Z=0. Tube in one shot: Workplane(\"XY\").circle(outer_d/2).circle(inner_d/2).extrude(height)\n(two concentric circles extrude as a ring). Solid: omit the inner circle (inner_d == 0). Washer = tube with height = thickness.\nTest ids: cylinder_*, tube_*, spacer_*, washer_*.\n\nDo\n1. Write talk_to_cad/families/cylinder.py and talk_to_cad/families/washer.py, each with build(spec).\n2. python -m pytest tests/test_families.py -k \"cylinder or tube or spacer or washer\" -q until green.\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -m pytest tests/test_families.py -k \"cylinder or tube or spacer or washer\" -q -p no:cacheprovider"
+      ]
+    },
+    {
+      "id": "J05",
+      "title": "box family (open-top tray)",
+      "gear": "small",
+      "depends_on": [
+        "J03"
+      ],
+      "max_minutes": 30,
+      "task": "Goal\nbox passes its geometry tests: outside dims exact, cavity (length-2*wall) x (width-2*wall) from z=floor to the top, closed floor.\n\nFacts (already verified)\nWorkplane(\"XY\").box(L, W, H, centered=(True, True, False)).faces(\">Z\").workplane(centerOption=\"ProjectedOrigin\")\n.rect(L - 2*wall, W - 2*wall).cutBlind(-(H - floor))   cuts the cavity downward from the top face.\ncheck_mesh sections at z=floor/2 (must be solid) and z=(floor+H)/2 (must show one rectangular cavity of the exact size).\n\nDo\n1. Write talk_to_cad/families/box.py with build(spec).\n2. python -m pytest tests/test_families.py -k box -q until green.\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -m pytest tests/test_families.py -k box -q -p no:cacheprovider"
+      ]
+    },
+    {
+      "id": "J06",
+      "title": "bracket family (L-bracket)",
+      "gear": "small",
+      "depends_on": [
+        "J03"
+      ],
+      "max_minutes": 40,
+      "task": "Goal\nbracket passes its geometry tests, then the whole family suite is green.\n\nFacts (already verified)\nCoordinates in PLAN.md: outer corner at the ORIGIN (not centred). Leg A: Workplane(\"XY\").box(leg_a, width, t, centered=False)\n(x 0..leg_a, y 0..width, z 0..t). Leg B: Workplane(\"XY\").box(t, width, leg_b, centered=False). wp = legA.union(legB).\nHoles by explicit cutters, not face selection:\n  leg A hole {d,x,y}: cutter = Workplane(\"XY\").center(x, y).circle(d/2).extrude(t);  wp = wp.cut(cutter)\n  leg B hole {d,x,y}: cutter = Workplane(\"YZ\").center(y, x).circle(d/2).extrude(t);  wp = wp.cut(cutter)\n  (Workplane(\"YZ\") normal is +X, local coordinates are (y, z); extrude(t) runs from x=0 to x=t.)\ncheck_mesh sections at z=t/2 (plane x,y: leg A holes) and x=t/2 (plane y,z: leg B holes). Analytic volume = legA + legB - t*t*width - holes.\n\nDo\n1. Write talk_to_cad/families/bracket.py with build(spec).\n2. python -m pytest tests/test_families.py -k bracket -q until green.\n3. Run the full python -m pytest tests/test_families.py -q and fix anything that regressed.\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -m pytest tests/test_families.py -q -p no:cacheprovider"
+      ]
+    },
+    {
+      "id": "J07",
+      "title": "CLI in spec mode",
+      "gear": "small",
+      "depends_on": [
+        "J04",
+        "J05",
+        "J06"
+      ],
+      "max_minutes": 40,
+      "task": "Goal\npython -m talk_to_cad --spec FILE builds a part folder; its flags match PLAN.md; exit codes are deterministic.\n\nFacts (already verified)\nFlags: positional description (optional), --spec FILE, --out DIR (default out/<YYYYmmdd_HHMMSS>_<name>), --bed MM\n(default env TALK_TO_CAD_BED_MM or 260), --no-preview, --no-ask, --dry-run. Description mode (LLM) is J09; in this job a\ndescription without --spec must print 'description mode not available yet' and exit 4.\nPreview is J08: if talk_to_cad.preview cannot be imported or --no-preview is given, skip the preview silently.\nLast stdout line must be the absolute out dir. Exit 0 on success, 2 on bad arguments or invalid spec (print the SpecError), 3 on bed-fit failure.\n\nDo\n1. Write talk_to_cad/__main__.py with argparse per the facts. Flow: load spec JSON -> build_part(spec, out_dir, bed) ->\n   (optional) preview.render(stl, os.path.join(out_dir, 'preview.png'), spec) -> print a 3-line summary\n   (family, bbox from checks-independent spec dims, files written) -> print the out dir last.\n2. --dry-run: validate and print the normalised spec as JSON, write nothing, exit 0.\n3. Smoke test with two golden specs written to out/golden_specs/ (run_golden.py writes them; or write them yourself from checks/golden.json).\n\nDo NOT\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -c \"import json,os; os.makedirs('out/golden_specs',exist_ok=True); g=json.load(open('checks/golden.json')); [json.dump(c['spec'],open('out/golden_specs/'+c['name']+'.json','w')) for c in g['cases']]\"",
+        "python -m talk_to_cad --spec out/golden_specs/plate_50x30x5_2holes.json --out out/j07_plate --no-preview",
+        "python checks/check_mesh.py out/j07_plate",
+        "python -m talk_to_cad --spec out/golden_specs/bracket_40x40x20x3.json --out out/j07_bracket --no-preview",
+        "python checks/check_mesh.py out/j07_bracket",
+        "python -m talk_to_cad --spec out/golden_specs/tube_25x20x40.json --dry-run",
+        "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'-m','talk_to_cad','--spec','out/golden_specs/plate_50x30x5_2holes.json','--out','out/j07_small_bed','--bed','40','--no-preview']); assert r.returncode==3, r.returncode\""
+      ]
+    },
+    {
+      "id": "J08",
+      "title": "Preview renderer (PIL + numpy painter's algorithm)",
+      "gear": "big",
+      "depends_on": [
+        "J07"
+      ],
+      "max_minutes": 60,
+      "task": "Goal\ntalk_to_cad/preview.py renders a readable isometric PNG with the dimensions on it, and the whole golden set passes checks/run_golden.py (spec mode).\n\nFacts (already verified)\nNo OpenGL, pyrender, matplotlib or Blender: PIL + numpy + trimesh only. checks/check_preview.py requires >= 800x600,\nnon-blank, object covering 2-90% of the frame. Target 1200x900, white background.\nIsometric orthographic view: rotate the mesh so the view direction is (1, 1, 1) -> e.g. rotate about Z by -45 deg then about X by\n-35.264 deg, then drop the depth axis. Painter's algorithm: sort triangles by mean depth, draw far to near with ImageDraw.polygon.\nLambert shading: shade = 0.35 + 0.65 * max(0, dot(normal, light)) with light = normalised (0.3, 0.4, 0.85) in view space;\nbase colour (120, 160, 220); outline each triangle in the same fill colour so edges don't show. Fit the part with a 10% margin.\n\nDo\n1. Write talk_to_cad/preview.py: render(stl_path, png_path, spec) -> png_path. Load with trimesh, centre on the bbox centre,\n   project, scale to fit, sort, draw, shade. Then draw a text block top-left with PIL's default font: name, family,\n   'L x W x H mm' from the spec dims (plate: length x width x thickness; cylinder/washer: outer_d x outer_d x height/thickness;\n   box: length x width x height; bracket: leg_a x width x leg_b) and one line per hole ('hole d=5 at (-20, 0)').\n   Bottom-left: 'bed 260 mm: fits' using the bed value passed via spec.get('_bed') or env TALK_TO_CAD_BED_MM.\n2. Hook it into __main__.py (already imports it when present).\n3. python checks/run_golden.py   -> all 8 cases OK (it builds each spec through the CLI and runs check_mesh + check_preview).\n\nDo NOT\nDo NOT draw with any GPU/GL library. Do NOT change __main__.py flags.\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python checks/run_golden.py",
+        "python checks/check_preview.py out/golden/bracket_40x40x20x3"
+      ]
+    },
+    {
+      "id": "J09",
+      "title": "LLM: description -> spec (prompt, parser, CLI description mode)",
+      "gear": "big",
+      "depends_on": [
+        "J07"
+      ],
+      "max_minutes": 60,
+      "task": "Goal\ntalk_to_cad/llm.py passes tests/test_llm_parse.py and python -m talk_to_cad \"<description>\" works against the local Ollama model.\n\nFacts (already verified)\nEndpoint: OpenAI-compatible POST to env TALK_TO_CAD_LLM_URL (default http://127.0.0.1:11434/v1/chat/completions) with\n{\"model\": env TALK_TO_CAD_LLM_MODEL, \"messages\": [...], \"temperature\": 0, \"stream\": false}; use urllib.request, 120 s timeout.\nQwen may wrap JSON in ``` fences and emit <think>...</think>; strip both. The model must NEVER invent a number: if a required dim\nis missing it must answer {\"missing\": [\"question\", ...]}. tests/test_llm_parse.py and tests/fixtures/llm_outputs/ are the exact\ncontract for build_messages and parse_model_output; checks/golden.json gives 8 description->spec pairs to use as few-shot examples\n(use 4 of them as examples; the live check later uses all 8, so the prompt must generalise, not memorise).\nThe CLI flow: describe_to_spec(description, ask) -> spec; ask=None (or --no-ask) means a {\"missing\"} answer is an error (exit 3)\ninstead of a prompt. Default ask = input() once per question, then re-call the model with followups appended.\n\nDo\n1. Write talk_to_cad/llm.py:\n   SYSTEM prompt (one string): the five families with their required dims and defaults, the coordinate conventions, the\n   literal words 'never invent' a number, 'mm', the key names corner_radius, inner_d, holes, holes_a, holes_b, wall, floor,\n   the {\"missing\": [...]} rule, 'JSON only', plus 4 few-shot example pairs from checks/golden.json.\n   build_messages(description, followups=None) -> [system, user, (assistant missing-json, user answer)*]; last message is the user.\n   parse_model_output(text): strip <think> blocks and fences, find the first balanced {...} that json.loads, return\n   {\"missing\": [...]} as-is or spec.validate(obj); raise LLMParseError on no JSON or on SpecError.\n   describe_to_spec(description, ask=input, max_rounds=3).\n2. Add description mode to __main__.py (replace the exit-4 stub): description -> describe_to_spec -> same build path as --spec.\n3. python -m pytest tests/test_llm_parse.py -q until green. Then try two golden descriptions live and read the spec.json\n   you get; tune the prompt until family, dims and holes match checks/golden.json exactly (names may differ).\n\nDo NOT\nDo NOT add the OpenAI SDK or requests. Do NOT lower the parser's strictness to make a fixture pass; fix the prompt or the parser.\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python -m pytest tests/test_llm_parse.py -q -p no:cacheprovider",
+        "python -m talk_to_cad \"A solid cylinder 20 mm in diameter and 30 mm tall.\" --out out/j09_live_cyl --no-ask --no-preview",
+        "python checks/check_mesh.py out/j09_live_cyl"
+      ]
+    },
+    {
+      "id": "J10",
+      "title": "Live golden run: 8 descriptions through the local model",
+      "gear": "small",
+      "depends_on": [
+        "J08",
+        "J09"
+      ],
+      "max_minutes": 30,
+      "task": "Goal\nAll 8 golden descriptions produce exactly the expected spec through the live model and pass every mesh and preview check.\n\nFacts (already verified)\npython checks/run_golden.py --live runs each description through python -m talk_to_cad --no-ask, compares family/dims/holes\nto checks/golden.json exactly, then runs check_mesh and check_preview. It prints the got/want spec for any mismatch.\n\nDo\n1. Run python checks/run_golden.py --live.\n2. If a case mismatches, fix the PROMPT in talk_to_cad/llm.py (few-shot wording, defaults rules), not the golden file, and rerun.\n3. Write in HANDOFF NOTES which cases needed prompt changes and what the change was.\n\nDo NOT\nDo NOT special-case golden descriptions in code.\nDo NOT edit anything under tests/ or checks/. Do NOT write tests of your own (no extra work). Do NOT install packages beyond those in PLAN.md. Do NOT touch files outside WORKDIR. Act, don't announce: finish the job, then write HANDOFF NOTES.",
+      "verify": [
+        "python checks/verify_untouched.py",
+        "python checks/run_golden.py --live",
+        "python -m pytest tests -q -p no:cacheprovider"
+      ]
+    }
+  ]
+}

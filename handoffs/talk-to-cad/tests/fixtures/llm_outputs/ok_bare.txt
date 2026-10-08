@@ -1,0 +1,1 @@
+{"spec_version":1,"family":"cylinder","name":"tube_25x20x40","dims":{"outer_d":25,"height":40,"inner_d":20}}

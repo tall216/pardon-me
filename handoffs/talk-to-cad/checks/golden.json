@@ -1,0 +1,57 @@
+{
+  "comment": "Golden set (written by Claude, do not edit). Each case: a plain-English description the local model must turn into exactly `spec`, and the spec itself which the builders must turn into a mesh that passes check_mesh.py. Family coordinate conventions are in PLAN.md.",
+  "cases": [
+    {
+      "name": "plate_50x30x5_2holes",
+      "description": "A rectangular plate 50 mm long, 30 mm wide and 5 mm thick, with two 5 mm holes on the centreline, each 20 mm from the centre along the length.",
+      "spec": {"spec_version": 1, "family": "plate", "name": "plate_50x30x5_2holes",
+               "dims": {"length": 50, "width": 30, "thickness": 5, "corner_radius": 0},
+               "holes": [{"d": 5, "x": -20, "y": 0}, {"d": 5, "x": 20, "y": 0}]}
+    },
+    {
+      "name": "plate_40x40x3_rounded",
+      "description": "A square plate 40 by 40 mm, 3 mm thick, with 5 mm rounded corners and no holes.",
+      "spec": {"spec_version": 1, "family": "plate", "name": "plate_40x40x3_rounded",
+               "dims": {"length": 40, "width": 40, "thickness": 3, "corner_radius": 5},
+               "holes": []}
+    },
+    {
+      "name": "cylinder_20x30_solid",
+      "description": "A solid cylinder 20 mm in diameter and 30 mm tall.",
+      "spec": {"spec_version": 1, "family": "cylinder", "name": "cylinder_20x30_solid",
+               "dims": {"outer_d": 20, "height": 30, "inner_d": 0}}
+    },
+    {
+      "name": "tube_25x20x40",
+      "description": "A tube 40 mm long with a 25 mm outside diameter and a 20 mm inside diameter.",
+      "spec": {"spec_version": 1, "family": "cylinder", "name": "tube_25x20x40",
+               "dims": {"outer_d": 25, "height": 40, "inner_d": 20}}
+    },
+    {
+      "name": "spacer_8x4p2x10",
+      "description": "A spacer 10 mm long, 8 mm outside diameter, with a 4.2 mm hole through it.",
+      "spec": {"spec_version": 1, "family": "cylinder", "name": "spacer_8x4p2x10",
+               "dims": {"outer_d": 8, "height": 10, "inner_d": 4.2}}
+    },
+    {
+      "name": "washer_12x6p4x1p6",
+      "description": "A flat washer: 12 mm outside diameter, 6.4 mm inside diameter, 1.6 mm thick.",
+      "spec": {"spec_version": 1, "family": "washer", "name": "washer_12x6p4x1p6",
+               "dims": {"outer_d": 12, "inner_d": 6.4, "thickness": 1.6}}
+    },
+    {
+      "name": "box_60x40x25_open",
+      "description": "An open-top tray 60 mm long, 40 mm wide and 25 mm tall.",
+      "spec": {"spec_version": 1, "family": "box", "name": "box_60x40x25_open",
+               "dims": {"length": 60, "width": 40, "height": 25, "wall": 2.4, "floor": 2.4}}
+    },
+    {
+      "name": "bracket_40x40x20x3",
+      "description": "An L-bracket with two 40 mm legs, 20 mm wide and 3 mm thick, with one 4.5 mm hole in each leg, 25 mm from the corner and centred across the width.",
+      "spec": {"spec_version": 1, "family": "bracket", "name": "bracket_40x40x20x3",
+               "dims": {"leg_a": 40, "leg_b": 40, "width": 20, "thickness": 3},
+               "holes_a": [{"d": 4.5, "x": 25, "y": 10}],
+               "holes_b": [{"d": 4.5, "x": 25, "y": 10}]}
+    }
+  ]
+}

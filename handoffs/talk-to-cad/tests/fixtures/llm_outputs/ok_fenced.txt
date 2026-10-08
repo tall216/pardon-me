@@ -1,0 +1,6 @@
+Here is the spec:
+```json
+{"spec_version": 1, "family": "plate", "name": "plate_50x30x5_2holes",
+ "dims": {"length": 50, "width": 30, "thickness": 5, "corner_radius": 0},
+ "holes": [{"d": 5, "x": -20, "y": 0}, {"d": 5, "x": 20, "y": 0}]}
+```

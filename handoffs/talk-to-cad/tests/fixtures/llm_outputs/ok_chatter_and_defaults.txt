@@ -1,0 +1,6 @@
+<think>The user wants an open tray. Wall not given, use the default.</think>
+Sure! An open-top tray. I'll leave wall and floor at the defaults.
+
+{"spec_version": 1, "family": "box", "name": "tray", "dims": {"length": 60, "width": 40, "height": 25}}
+
+Let me know if you want a lid.
