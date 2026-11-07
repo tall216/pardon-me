@@ -1,6 +1,6 @@
 # Uncle D
 
-`CONFIRMED` Uncle D exists and has a Cartoony character sheet. The sheet is the
+`CONFIRMED` Uncle D exists and has a Cartoony data sheet (shared with Winston). The sheet is the
 visual source of truth. Nothing here describes how he is drawn.
 
 ## Known

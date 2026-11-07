@@ -9,9 +9,15 @@ the rest of the repo.
 - The show is called **Alderinos**.
 - It is based around **Alderinos Pub & Pasta**, a bar and restaurant.
 - It is set in the **Collinwood** neighborhood of **Cleveland, Ohio**, **circa 1999**.
-- Characters named so far: **Uncle D** (has a Cartoony sheet), **Winston**
-  (first look in progress). **Quail Hollow** is in the pipeline as a drawing
-  set; its role in the show has not been stated yet.
+- Approved characters so far: **Uncle D**, **Winston**, **Ariana**, and
+  **the owner** (a cartoon version of the show's creator). Uncle D and Winston
+  have a data sheet in the Cartoony pipeline. Winston's first look and outfits
+  are in progress.
+- **Quail Hollow** is in the pipeline as a drawing set; its role in the show
+  has not been stated yet.
+- The pipeline, the data sheet, the framing rules, and `LESSONS.md` live on the
+  owner's computer, in the Cartoony working folder, not in this repo. These
+  notes should be moved next to them.
 
 ## How these notes work
 

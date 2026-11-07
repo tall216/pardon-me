@@ -1,6 +1,6 @@
 # Winston
 
-`CONFIRMED` Winston exists. His first look is being produced in the Cartoony
+`CONFIRMED` Winston exists and shares a data sheet with Uncle D. His first look is being produced in the Cartoony
 pipeline, along with outfits. Once his sheet exists it is the visual source of
 truth.
 

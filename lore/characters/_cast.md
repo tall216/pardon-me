@@ -8,6 +8,10 @@ One line each. A character gets a file once there is more than a line to say.
   `OPEN`. File: `uncle-d.md`.
 - **Winston** (`CONFIRMED` exists, first look in progress, outfits in
   progress) — role in the show `OPEN`. File: `winston.md`.
+- **Ariana** (`CONFIRMED` approved character) — role in the show `OPEN`.
+  File: `ariana.md`.
+- **The owner** (`CONFIRMED` approved character; a cartoon version of the
+  show's creator) — role in the show `OPEN`. File: `owner.md`.
 
 ## Not yet named
 
