@@ -1,60 +1,37 @@
 # The world
 
-## Where and when
+## Setting (CONFIRMED)
 
-`CONFIRMED` The show is set in and around **Quail Hollow**.
+Collinwood, a neighborhood on the east side of Cleveland, Ohio. Circa 1999.
 
-`PROPOSED` Quail Hollow is a small town in a wooded valley somewhere in the
-American South, far enough from a city that nobody drives to one. The valley is
-shaped like a shallow bowl. The town sits at the bottom, the water tower on the
-rim, and everything in between is porches, pines, and gravel.
+## Real-world reference
 
-`PROPOSED` The era is **deliberately unpinned**. Trucks are old. Televisions
-have knobs. There is one computer in town (at the library) and it is treated like
-a wild animal. Phones exist but are always the wrong tool: they ring at the
-wrong time, the cord is too short, the one working payphone is at the far end of
-Main Street. This is a tone choice, not a date. Nobody in the show says a year.
+Background for grounding. Pulled from general knowledge, not verified against
+sources for this project. Check anything before it goes on screen.
 
-`OPEN` Is the valley in a specific real region (a named state, a real accent)?
-The Director should keep place names fictional and accents soft until this is
-settled.
+- Collinwood sits on Cleveland's northeast side along the lake, split by the
+  rail yards into North and South Collinwood. Historically a railroad
+  neighborhood with deep Italian-American, Slovenian, and Irish roots.
+- Waterloo Road is the main strip in North Collinwood. The Beachland Ballroom
+  opened there in 2000, so in 1999 the strip is pre-arts-district: bars,
+  storefronts, some empty.
+- Euclid Beach Park, the lakefront amusement park, closed in 1969. In 1999 the
+  arch still stands and people still talk about it.
+- Cleveland in 1999: the Browns come back as an expansion team and open the
+  new stadium (they go 2-14). The Indians win the division at Jacobs Field.
+  The Rock and Roll Hall of Fame has been open four years. The Flats are still
+  the place to go out. Y2K is on every TV.
+- Pop culture in the air: The Drew Carey Show is on and set in Cleveland.
+  Dial-up internet. Pagers. Flip phones for people with money.
 
-## Scale
+## What the show says about its world
 
-`PROPOSED` Quail Hollow has about four hundred people, and the show knows
-roughly thirty of them. Everyone knows everyone. News travels by porch. If
-something happens at Mabel's Place at noon, Uncle D knows about it by twelve
-fifteen and has an opinion by twelve twenty.
+`OPEN` Everything below needs a decision.
 
-The valley has one road in and out, **Old Covey Road**, which goes over the rim
-by the water tower. "Leaving town" is a big deal and almost never happens on
-screen.
-
-## How the world feels
-
-`PROPOSED`
-
-- **Slow and loud.** Nothing needs to happen fast, and everyone is yelling
-  anyway, from porch to porch, across the creek, up the water tower.
-- **Hand-fixed.** Everything in town has been repaired at least once by someone
-  who was not qualified to repair it. Uncle D is usually that someone. Things
-  work, but visibly.
-- **Watched by quail.** The town is named for the California quail that live on
-  every fence rail. They move as one flock, they are always looking at whoever
-  is doing the dumbest thing, and they scatter at punchlines. They are the
-  show's laugh track and its conscience. (See `characters/_cast.md`, "The Covey".)
-
-## Economy and daily life
-
-`PROPOSED` Nobody has much and nobody minds. Money appears in the show as a
-*problem to solve this week* (the water bill, the raffle, the price of a new
-hubcap), never as a threat. Uncle D does odd jobs and is paid in favors as
-often as cash. Winston keeps a ledger of what Uncle D is owed and it is the
-longest document in town.
-
-## What the world is for, in story terms
-
-`PROPOSED` Quail Hollow is a place where a small plan can go very wrong very
-publicly, and where being forgiven afterward is guaranteed. That guarantee is
-what lets Uncle D be reckless and lets Winston learn, slowly, that a plan
-surviving contact with the Hollow is not the same as a plan being good.
+- Is the Collinwood of the show the real one or a cartoon version with made-up
+  streets? Default until told: real neighborhood, real landmarks, fictional
+  businesses and people.
+- How much of 1999 shows up: wall-to-wall references, or just the texture
+  (no cell phones, the Browns on the bar TV)?
+- Who are the regulars at the pub, and is the show about the staff, the
+  family, or the neighborhood?

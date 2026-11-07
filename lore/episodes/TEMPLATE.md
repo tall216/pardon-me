@@ -27,7 +27,7 @@ keeping gets added to the character file in the same commit.
 
 ## Running gags used
 
-At most two. From `../characters/_cast.md`.
+From `../characters/_cast.md`.
 
 ## Lore touched
 
